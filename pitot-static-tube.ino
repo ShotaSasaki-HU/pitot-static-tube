@@ -53,15 +53,19 @@ void loop() {
     Serial.print(real_temperature, 2); // 小数点2桁まで
     Serial.print(" °C\t");
 
+    // 空気密度（kg/m^3）
+    // http://sasaki.g1.xrea.com/powerpoint/vaporization-heat/03-Air-density.pdf
+    float rho = 353.017 / (273.15 + real_temperature); // 気体の質量密度rho = (M * P) / (R * T) / 1000
+    Serial.print("Rho: ");
+    Serial.print(rho, 2); // 小数点2桁まで
+    Serial.print(" kg/m^3\t");
+
     // 流速（km/h）
-    // U = sqrt(2 * dP / rho)
     float speed_kmh = 0.0;
-    float rho = 1.2; // 空気密度（kg/m^3）
     if (diff_pressure > 0) {
-      float speed_ms = sqrt((2.0 * diff_pressure) / rho);
+      float speed_ms = sqrt((2.0 * diff_pressure) / rho); // 流速U = sqrt(2 * dP / rho)
       speed_kmh = speed_ms * 3.6; // speed_ms * 60 * 60 / 1000
     }
-
     Serial.print("Speed: ");
     Serial.print(speed_kmh, 1); // 小数点1桁まで
     Serial.println(" km/h");
