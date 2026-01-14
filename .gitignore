@@ -1,0 +1,48 @@
+# ======================
+# Arduino build files
+# ======================
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.o
+*.a
+*.d
+
+# Build / cache folders
+build/
+out/
+Debug/
+Release/
+
+# ======================
+# Arduino IDE
+# ======================
+*.tmp
+*.bak
+*.log
+
+# ======================
+# VS Code
+# ======================
+.vscode/
+*.code-workspace
+
+# ======================
+# OS specific
+# ======================
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ======================
+# Others
+# ======================
+*.swp
+*.swo
+*~
