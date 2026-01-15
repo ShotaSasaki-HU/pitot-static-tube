@@ -49,7 +49,7 @@ public:
         cfg.dummy_read_pixel =     8; // ピクセル読出し前のダミーリードのビット数
         cfg.dummy_read_bits  =     1; // ピクセル以外のデータ読出し前のダミーリードのビット数
         cfg.readable         = false; // データ読出しが可能な場合 trueに設定
-        cfg.invert           = false; // パネルの明暗が反転してしまう場合 trueに設定
+        cfg.invert           =  true; // パネルの明暗が反転してしまう場合 trueに設定
         cfg.rgb_order        = false; // パネルの赤と青が入れ替わってしまう場合 trueに設定
         cfg.dlen_16bit       = false; // 16bitパラレルやSPIでデータ長を16bit単位で送信するパネルの場合 trueに設定
         cfg.bus_shared       = false; // SDカードとバスを共有している場合 trueに設定(drawJpgFile等でバス制御を行います)
@@ -105,8 +105,6 @@ void setup() {
   // sprite.setFont(&fonts::Orbitron_Light_24); // カッコいいフォント例
 }
 
-int count = 0;
-
 void loop() {
   float diff_pressure = 0.0;
   float temperature = 0.0;
@@ -150,28 +148,27 @@ void loop() {
   // --- 描画処理 ---
 
   // 1. 背景を塗りつぶす（消去）
-  sprite.fillScreen(TFT_BLACK);
+  // sprite.fillScreen(lcd.color888(255, 0, 0)); // 綺麗な赤色
+  sprite.fillScreen(lcd.color888(0, 255, 0)); // 黄緑？
+  // sprite.fillScreen(lcd.color888(0, 0, 255)); // 綺麗な青色
 
   // 2. デザインを描く
   // 外周のリング
-  sprite.drawCircle(120, 120, 118, TFT_BLUE);
-  sprite.drawCircle(120, 120, 117, TFT_CYAN);
+  sprite.drawCircle(120, 120, 118, lcd.color888(0, 0, 255));
+  sprite.drawCircle(120, 120, 117, lcd.color888(0, 0, 255));
   
   // 中心に数値を表示
   sprite.setCursor(90, 100); // 位置合わせ
-  sprite.printf("%d", count);
+  sprite.printf("%4.2f", real_temperature);
   
   // 単位
   sprite.setCursor(90, 130);
   sprite.setTextSize(1);
-  sprite.print("TEST RUN");
+  sprite.print("C");
   sprite.setTextSize(2); // 戻す
 
   // 3. 画面に転送（ここで初めて表示される）
   sprite.pushSprite(0, 0);
-
-  count++;
-  if (count > 999) count = 0;
 
   delay(100); // 10Hz
 }
