@@ -151,7 +151,7 @@ public:
   RotatableSprite(LGFX* lgfx, int16_t w, int16_t h) // wとhはスプライト自身の大きさ
     // 初期化リスト（代入ではなく生成時に初期化できる．）
     : _sprite(lgfx),
-      _current_angle(0)
+      _current_angle(0) // 元の向きからの相対角度
   {
     _sprite.setColorDepth(16);
     _sprite.createSprite(w, h);
@@ -175,7 +175,7 @@ public:
 
   // 角度の更新メソッド（即時反映）
   void setAngle(float angle) {
-    _current_angle = angle - 90; // 上向きが0度
+    _current_angle = angle; // 元の向きからの相対角度
   }
 
   // メインキャンバスへの描画
@@ -237,7 +237,10 @@ void setup() {
   });
 }
 
+int i = 0;
+
 void loop() {
+  Serial.print("angle: "); Serial.print(i); Serial.print(" degrees\t");
   if (sensor.update()) {
     Serial.print("Press: "); Serial.print(sensor.getPressurePa()); Serial.print(" Pa\t");
     Serial.print("Temp: ");  Serial.print(sensor.getCalibratedTemperatureC()); Serial.print(" C\t");
@@ -248,8 +251,10 @@ void loop() {
   
   // --- 描画処理 ---
   canvas.fillScreen(lcd.color888(255, 0, 0));
+  speed_pointer.setAngle(float(i));
   speed_pointer.draw(&canvas, canvas.width() >> 1, canvas.height() >> 1); // 回転中心pivotの座標を指定
   canvas.pushSprite(0, 0); // 転送
 
   delay(100);  // 10Hz
+  i = (i + 2) % 360;
 }
