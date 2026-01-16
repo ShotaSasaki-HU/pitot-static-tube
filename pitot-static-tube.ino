@@ -51,6 +51,7 @@ public:
     _calibrated_temp_c = _raw_temp_c + _temp_offset_c;
 
     // 物理計算
+    calcAirspeed();
 
     return true;
   }
@@ -317,7 +318,7 @@ void loop() {
   }
   
   // --- 描画処理 ---
-  indicator.update(sensor.getCalibratedTemperatureC(), dt_s);
+  indicator.update(sensor.getSpeedKmh(), dt_s);
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
