@@ -137,7 +137,7 @@ public:
   }
 };
 
-// 回転可能なスプライトを扱うクラス
+// Z軸で回転可能なスプライトを扱うクラス
 class RotatableSprite {
 private:
   LGFX_Sprite _sprite;  // 針の画像を保持するスプライト
@@ -191,12 +191,92 @@ public:
       TRANSPARENT     // transp
     );
   }
+
+  // Getters
+  uint16_t width() const { return _sprite.width(); }
+  uint16_t height() const { return _sprite.height(); }
+};
+
+class AirspeedIndicator {
+private:
+  // 部品
+  RotatableSprite _speed_pointer;
+  RotatableSprite _vmo_pointer;
+  // RollingDial _digital_airspeed;
+  // RollingDial _digital_battery;
+
+  // 設定値
+  float _max_scale_kmh;
+  float _max_operating_airspeed;
+  float _max_angle; // 上向き0度で時計回り
+
+public:
+  AirspeedIndicator(LGFX* lgfx)
+    : _speed_pointer(lgfx, 8, 102),
+      _vmo_pointer(lgfx, 11, 102)
+  {
+    _max_scale_kmh = 60.0;
+    _max_operating_airspeed = 35.0;
+    _max_angle = 330.0;
+
+    // Speed Pointer
+    _speed_pointer.setPivot(_speed_pointer.width() >> 1, _speed_pointer.height());
+    _speed_pointer.createSpriteImage([](LGFX_Sprite* sp) {
+      int w = sp->width();
+      int h = sp->height();
+
+      sp->fillTriangle(w >> 1, 0, w, 16, 0, 16, sp->color888(253, 231, 184));
+      sp->fillRect(0, 16, 8, 20, sp->color888(253, 231, 184));
+      sp->fillRect(2.5, 36, 3, 66, sp->color888(253, 231, 184));
+    });
+  }
+
+  void update(float raw_speed_kmh, float dt_s) {
+    // Speed Pointer（生値に即応）
+    float clamped_speed = constrain(raw_speed_kmh, 0.0, _max_scale_kmh);
+    float angle = mapFloat(clamped_speed, 0.0, _max_scale_kmh, 0.0, _max_angle);
+    _speed_pointer.setAngle(angle);
+
+    // Vmo Pointer
+
+    // Digital Airspeed
+
+    // Digital Battery
+  }
+
+  void draw(LGFX_Sprite* canvas) {
+    int center_x = canvas->width() >> 1;
+    int center_y = canvas->height() >> 1;
+
+    // Background
+    canvas->fillScreen(canvas->color888(28, 26, 29));
+
+    // Digital Airspeed
+
+    // Digital Battery
+
+    // Speed Pointer
+    _speed_pointer.draw(canvas, center_x, center_y);
+
+    // Vmo Pointer
+
+    // Circle
+    canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45));
+  }
+
+  // 浮動小数点のmap関数
+  float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+  }
 };
 
 PitotStaticTube sensor;
+
 LGFX lcd; // ディスプレイのインスタンス
 LGFX_Sprite canvas(&lcd); // 描画バッファ
-RotatableSprite speed_pointer(&lcd, 24, 120);
+AirspeedIndicator indicator(&lcd);
+
+unsigned long prev_time_ms = 0;
 
 void setup() {
   // 無線機能を明示的にOFF（発熱対策・省電力）
@@ -219,33 +299,14 @@ void setup() {
   lcd.setRotation(0); // 回転方向を 0～3 の4方向から設定します．（4～7を使用すると上下反転になります．）
   lcd.setColorDepth(16);
   canvas.createSprite(lcd.width(), lcd.height());
-
-  speed_pointer.setPivot(12, 120);
-  speed_pointer.createSpriteImage([](LGFX_Sprite* sp) {
-    int w = sp->width();
-    int h = sp->height();
-
-    // 三角形
-    sp->fillTriangle(
-      w / 2, 0,
-      w, 20,
-      0, 20,
-      sp->color888(255, 255, 255)
-    );
-
-    // センターライン
-    sp->drawLine(
-      w / 2, 0,
-      w / 2, h,
-      sp->color888(255, 255, 255)
-    );
-  });
 }
 
-int i = 0;
-
 void loop() {
-  Serial.print("angle: "); Serial.print(i); Serial.print(" degrees\t");
+  // 時間管理
+  unsigned long current_time_ms = millis();
+  float dt_s = (current_time_ms - prev_time_ms) / 1000.0;
+  prev_time_ms = current_time_ms;
+
   if (sensor.update()) {
     Serial.print("Press: "); Serial.print(sensor.getPressurePa()); Serial.print(" Pa\t");
     Serial.print("Temp: ");  Serial.print(sensor.getCalibratedTemperatureC()); Serial.print(" C\t");
@@ -255,11 +316,9 @@ void loop() {
   }
   
   // --- 描画処理 ---
-  canvas.fillScreen(lcd.color888(255, 0, 0));
-  speed_pointer.setAngle(float(i));
-  speed_pointer.draw(&canvas, canvas.width() >> 1, canvas.height() >> 1); // 回転中心pivotの座標を指定
+  indicator.update(sensor.getCalibratedTemperatureC(), dt_s);
+  indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
-  delay(100);  // 10Hz
-  i = (i + 2) % 360;
+  delay(100);
 }
