@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <SensirionI2CSdp.h>
 #include <LovyanGFX.hpp> // v1.2.7
+#include <WiFi.h>
 
 #define SDA_PIN 6
 #define SCL_PIN 7
@@ -198,6 +199,10 @@ LGFX_Sprite canvas(&lcd); // 描画バッファ
 RotatableSprite speed_pointer(&lcd, 24, 120);
 
 void setup() {
+  // 無線機能を明示的にOFF（発熱対策・省電力）
+  WiFi.mode(WIFI_OFF);
+  btStop();
+
   Serial.begin(115200); // シリアル通信開始
   while (!Serial) {
     delay(100); // シリアル接続待ち
