@@ -7,6 +7,79 @@
 #define SCL_PIN 7
 #define SDP810_500Pa_I2C_ADDRESS 0x25
 
+class PitotStaticTube {
+private:
+  SensirionI2CSdp sdp; // センサのインスタンス
+  float _diff_pressure_pa = 0.0;
+  float _raw_temp_c = 0.0;
+  float _calibrated_temp_c = 0.0;
+  float _speed_kmh = 0.0;
+
+  float _temp_offset_c = -3.0; // 温度補正オフセット（自己発熱分）
+
+public:
+  PitotStaticTube() {}
+
+  bool begin() {
+    /**
+     * @brief 初期化処理
+     */
+    sdp.begin(Wire, SDP810_500Pa_I2C_ADDRESS); // センサの初期化
+    sdp.stopContinuousMeasurement(); // 念の為，一旦停止．
+    // 計測開始（差圧・温度補正あり・平均化モード）
+    uint16_t error = sdp.startContinuousMeasurementWithDiffPressureTCompAndAveraging();
+    return (error == 0); // エラーが無ければtrue
+  }
+
+  void setTemperatureOffset(float offset) {
+    /**
+     * @brief 温度補正オフセット値を外部から変更するメソッド（ハードコードを忌避）
+     */
+    _temp_offset_c = offset;
+  }
+
+  bool update() {
+    /**
+     * @brief ReadとCalibrateとCalculateを行う更新メソッド
+     * @return 成功ならtrue
+     */
+    uint16_t error = sdp.readMeasurement(_diff_pressure_pa, _raw_temp_c);
+    if (error) { return false; }
+
+    // 温度補正
+    _calibrated_temp_c = _raw_temp_c + _temp_offset_c;
+
+    // 物理計算
+
+    return true;
+  }
+
+  void calcAirspeed() {
+    /**
+     * @brief 空気密度と対気速度の計算を行うメソッド
+     */
+    // 空気密度（kg/m^3）
+    // 気体の質量密度rho = (M * P) / (R * T) / 1000
+    // http://sasaki.g1.xrea.com/powerpoint/vaporization-heat/03-Air-density.pdf
+    float rho = 353.017 / (273.15 + _calibrated_temp_c);
+
+    // 流速（km/h）
+    // 流速U = sqrt(2 * dP / rho)
+    if (_diff_pressure_pa > 0) {
+      float speed_ms = sqrt((2.0 * _diff_pressure_pa) / rho);
+      _speed_kmh = speed_ms * 3.6; // speed_ms * 60 * 60 / 1000
+    } else {
+      _speed_kmh = 0.0;
+    }
+  }
+
+  // Getters
+  // constメソッドは，メンバ変数を書き換えられないため，副作用が無い．
+  float getSpeedKmh() const { return _speed_kmh; }
+  float getPressurePa() const { return _diff_pressure_pa; }
+  float getCalibratedTemperatureC() const { return _calibrated_temp_c; }
+};
+
 // ESP32でLovyanGFXを独自設定で利用
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_GC9A01 _panel_instance;
@@ -119,8 +192,7 @@ public:
   }
 };
 
-SensirionI2CSdp sdp; // センサのインスタンス
-
+PitotStaticTube sensor;
 LGFX lcd; // ディスプレイのインスタンス
 LGFX_Sprite canvas(&lcd); // 描画バッファ
 RotatableSprite speed_pointer(&lcd, 24, 120);
@@ -133,31 +205,15 @@ void setup() {
 
   Wire.begin(SDA_PIN, SCL_PIN); // I2Cの初期化
 
-  sdp.begin(Wire, SDP810_500Pa_I2C_ADDRESS); // センサの初期化
-  sdp.stopContinuousMeasurement(); // 念の為，一旦停止．
-
-  // 計測開始（差圧・温度補正あり・平均化モード）
-  uint16_t error = sdp.startContinuousMeasurementWithDiffPressureTCompAndAveraging();
-  if (error) {
-    char error_message[256];
-    errorToString(error, error_message, 256);
-    Serial.print("Error initializing SDP810: ");
-    Serial.println(error_message);
-    while (1) { delay(1000); } // エラーならここで停止
+  if (!sensor.begin()) {
+    Serial.println("Sensor Init Failed!");
+    while(1) { delay(100); }
   }
-
-  Serial.println("SDP810 Initialized successfully!");
-  Serial.println("------------------------------------------------");
 
   lcd.init();
   lcd.setRotation(0); // 回転方向を 0～3 の4方向から設定します．（4～7を使用すると上下反転になります．）
-  // 必要に応じてカラーモードを設定（初期値は16）
-  // 16の方がSPI通信量が少なく高速に動作しますが，赤と青の諧調が5bitになります．
-  // 24の方がSPI通信量が多くなりますが，諧調表現が綺麗になります．
   lcd.setColorDepth(16);
-
   canvas.createSprite(lcd.width(), lcd.height());
-  canvas.setColorDepth(16);
 
   speed_pointer.setPivot(12, 120);
   speed_pointer.createSpriteImage([](LGFX_Sprite* sp) {
@@ -182,50 +238,17 @@ void setup() {
 }
 
 void loop() {
-  float diff_pressure = 0.0;
-  float temperature = 0.0;
-  float real_temperature = 0.0;
-
-  // センサから値を読み取る．
-  uint16_t error = sdp.readMeasurement(diff_pressure, temperature);
-
-  if (!error) {
-    // 差圧（Pascal）
-    Serial.print("Press: ");
-    Serial.print(diff_pressure, 2); // 小数点2桁まで
-    Serial.print(" Pa\t");
-
-    // 温度（Celsius）
-    real_temperature = temperature - 3.0; // センサの自己発熱を3.0°Cと仮定（2026年1月15日3時58分）
-    Serial.print("Temp: ");
-    Serial.print(real_temperature, 2); // 小数点2桁まで
-    Serial.print(" °C\t");
-
-    // 空気密度（kg/m^3）
-    // http://sasaki.g1.xrea.com/powerpoint/vaporization-heat/03-Air-density.pdf
-    float rho = 353.017 / (273.15 + real_temperature); // 気体の質量密度rho = (M * P) / (R * T) / 1000
-    Serial.print("Rho: ");
-    Serial.print(rho, 2); // 小数点2桁まで
-    Serial.print(" kg/m^3\t");
-
-    // 流速（km/h）
-    float speed_kmh = 0.0;
-    if (diff_pressure > 0) {
-      float speed_ms = sqrt((2.0 * diff_pressure) / rho); // 流速U = sqrt(2 * dP / rho)
-      speed_kmh = speed_ms * 3.6; // speed_ms * 60 * 60 / 1000
-    }
-    Serial.print("Speed: ");
-    Serial.print(speed_kmh, 1); // 小数点1桁まで
-    Serial.println(" km/h");
+  if (sensor.update()) {
+    Serial.print("Press: "); Serial.print(sensor.getPressurePa()); Serial.print(" Pa\t");
+    Serial.print("Temp: ");  Serial.print(sensor.getCalibratedTemperatureC()); Serial.print(" C\t");
+    Serial.print("Speed: "); Serial.print(sensor.getSpeedKmh());   Serial.println(" km/h");
   } else {
-    Serial.println("Error reading measurement.");
+    Serial.println("Sensor Read Error!");
   }
-
+  
   // --- 描画処理 ---
   canvas.fillScreen(lcd.color888(255, 0, 0));
-
   speed_pointer.draw(&canvas, canvas.width() >> 1, canvas.height() >> 1); // 回転中心pivotの座標を指定
-
   canvas.pushSprite(0, 0); // 転送
 
   delay(100);  // 10Hz
