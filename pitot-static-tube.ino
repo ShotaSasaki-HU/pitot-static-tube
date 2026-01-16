@@ -289,6 +289,7 @@ void setup() {
   }
 
   Wire.begin(SDA_PIN, SCL_PIN); // I2Cの初期化
+  Wire.setClock(50000); // 50kHz（安定性重視で低め）
 
   if (!sensor.begin()) {
     Serial.println("Sensor Init Failed!");
