@@ -207,29 +207,60 @@ private:
   // RollingDial _digital_battery;
 
   // 設定値
-  float _max_scale_kmh;
   float _max_operating_airspeed;
   float _max_angle; // 上向き0度で時計回り
+  float _max_scale_kmh;
+  float _major_tick_interval_kmh; // 主目盛の間隔
+  float _minor_tick_interval_kmh; // 副目盛の間隔
+  float _number_interval_kmh; // 目盛の数字を表示する間隔
 
 public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102)
   {
-    _max_scale_kmh = 60.0;
     _max_operating_airspeed = 35.0;
-    _max_angle = 330.0;
+    _max_angle = 335.0;
+    _max_scale_kmh = 55.0;
+    _minor_tick_interval_kmh = 1.0;
+    _major_tick_interval_kmh = 5.0 * _minor_tick_interval_kmh;
+    _number_interval_kmh = 2.0 * _major_tick_interval_kmh;
 
     // Speed Pointer
     _speed_pointer.setPivot(_speed_pointer.width() >> 1, _speed_pointer.height());
     _speed_pointer.createSpriteImage([](LGFX_Sprite* sp) {
       int w = sp->width();
-      int h = sp->height();
+      // int h = sp->height();
 
       sp->fillTriangle(w >> 1, 0, w, 16, 0, 16, sp->color888(253, 231, 184));
-      sp->fillRect(0, 16, 8, 20, sp->color888(253, 231, 184));
+      sp->fillRect(0, 16, w, 20, sp->color888(253, 231, 184));
       sp->fillRect(2.5, 36, 3, 66, sp->color888(253, 231, 184));
     });
+
+    // Vmo Pointer
+    _vmo_pointer.setPivot(_vmo_pointer.width() >> 1, _vmo_pointer.height());
+    _vmo_pointer.createSpriteImage([](LGFX_Sprite* sp) {
+      int w = sp->width();
+      // int h = sp->height();
+
+      sp->fillTriangle(w >> 1, 0, w, 21, 0, 21, sp->color888(226, 219, 219));
+      sp->fillRect(0, 21, w, 81, sp->color888(226, 219, 219));
+
+      sp->fillTriangle(2.8, 9.3, 9.7, 16, 0.5, 19, sp->color888(246, 6, 18));
+      sp->fillTriangle(9.7, 16, w, 21, 0.5, 19, sp->color888(246, 6, 18));
+      sp->fillTriangle(0.5, 19, w, 21, w, 30, sp->color888(246, 6, 18));
+
+      sp->fillTriangle(0, 32, w, 43, 0, 44.5, sp->color888(246, 6, 18));
+      sp->fillTriangle(0, 44.5, w, 43, w, 55, sp->color888(246, 6, 18));
+
+      sp->fillTriangle(0, 56.3, w, 67, 0, 69.3, sp->color888(246, 6, 18));
+      sp->fillTriangle(0, 69.3, w, 67, w, 80, sp->color888(246, 6, 18));
+
+      sp->fillTriangle(0, 80, w, 90.8, 0, 90.8, sp->color888(246, 6, 18));
+      sp->fillRect(0, 90.8, w, 11.2, sp->color888(246, 6, 18));
+    });
+    float angle = mapFloat(_max_operating_airspeed, 0.0, _max_scale_kmh, 0.0, _max_angle);
+    _vmo_pointer.setAngle(angle);
   }
 
   void update(float raw_speed_kmh, float dt_s) {
@@ -237,8 +268,6 @@ public:
     float clamped_speed = constrain(raw_speed_kmh, 0.0, _max_scale_kmh);
     float angle = mapFloat(clamped_speed, 0.0, _max_scale_kmh, 0.0, _max_angle);
     _speed_pointer.setAngle(angle);
-
-    // Vmo Pointer
 
     // Digital Airspeed
 
@@ -249,20 +278,40 @@ public:
     int center_x = canvas->width() >> 1;
     int center_y = canvas->height() >> 1;
 
+    // 背景は静的なスプライトに保存しておきたかったが，おそらくRAMが不足して実現できない．
+
     // Background
     canvas->fillScreen(canvas->color888(28, 26, 29));
 
+    // Tick Marks
+    float r = 102.0;
+    for (int i = 0; i <= _max_scale_kmh; i += _major_tick_interval_kmh) {
+      float angle = mapFloat(float(i), 0.0, _max_scale_kmh, 0.0, _max_angle);
+      angle -= 90.0; // canvasの座標上の単位円における角度
+      angle *= DEG_TO_RAD; // 三角関数のために変換
+      float x0 = (r * cos(angle)) + float(center_x);
+      float y0 = (r * sin(angle)) + float(center_y);
+      float x1 = ((r + 18.0) * cos(angle)) + float(center_x);
+      float y1 = ((r + 18.0) * sin(angle)) + float(center_y);
+      canvas->drawLine(x0, y0, x1, y1, canvas->color888(255, 255, 255));
+
+      for (int j = i + _minor_tick_interval_kmh; j < (i + _major_tick_interval_kmh) && j <= _max_scale_kmh; j += _minor_tick_interval_kmh) {
+        angle = mapFloat(float(j), 0.0, _max_scale_kmh, 0.0, _max_angle);
+        angle -= 90.0; // canvasの座標上の単位円における角度
+        angle *= DEG_TO_RAD; // 三角関数のために変換
+        x0 = (r * cos(angle)) + float(center_x);
+        y0 = (r * sin(angle)) + float(center_y);
+        x1 = ((r + 9.0) * cos(angle)) + float(center_x);
+        y1 = ((r + 9.0) * sin(angle)) + float(center_y);
+        canvas->drawLine(x0, y0, x1, y1, canvas->color888(255, 255, 255));
+      }
+    }
+
     // Digital Airspeed
-
     // Digital Battery
-
-    // Speed Pointer
-    _speed_pointer.draw(canvas, center_x, center_y);
-
-    // Vmo Pointer
-
-    // Circle
-    canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45));
+    _vmo_pointer.draw(canvas, center_x, center_y); // Vmo Pointer
+    _speed_pointer.draw(canvas, center_x, center_y); // Speed Pointer
+    canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45)); // 中央の円
   }
 
   // 浮動小数点のmap関数
