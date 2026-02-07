@@ -210,6 +210,8 @@ private:
   int _digits_int; // 整数部の桁数
   int _digits_dec; // 小数部の桁数
 
+  bool _show_decimal_point = true; // 小数点表示の有無
+
   // アニメーション用状態
   float _current_val;        // 現在表示中の値
   float _max_change_per_sec; // 追従制限
@@ -223,7 +225,8 @@ public:
     LGFX* lgfx,
     int width, int normal_height, uint16_t tall_flags,
     int digits_int, int digits_dec,
-    float max_change_per_sec
+    float max_change_per_sec,
+    bool show_decimal_point
   )
     : _sprite(lgfx),
 
@@ -234,6 +237,8 @@ public:
 
       _digits_int(digits_int),
       _digits_dec(digits_dec),
+
+      _show_decimal_point(show_decimal_point),
 
       _max_change_per_sec(max_change_per_sec)
   {
@@ -319,7 +324,7 @@ public:
         _sprite.drawString(String((buf[i] - '0' - 1 + 10) % 10), x_main, y_main + _normal_height);
 
         // 小数点の描画
-        if (n + 1 == _digits_int) {
+        if (_show_decimal_point && n + 1 == _digits_int) {
           int x_dot = x_main + (dial_width / 2) - 2;
           int y_dot = (_tall_height >> 1) + y_visual_offset;
           _sprite.drawString(String('.'), x_dot, y_dot);
@@ -431,8 +436,8 @@ public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
-      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0),
-      _digital_battery(lgfx, 66, 27, 0b000, 3, 0, 10.0)
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0, true),
+      _digital_battery(lgfx, 66, 27, 0b000, 3, 0, 10.0, false)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -629,5 +634,5 @@ void loop() {
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
-  delay(100);
+  delay(50);
 }
