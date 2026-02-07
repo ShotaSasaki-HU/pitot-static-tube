@@ -291,10 +291,12 @@ public:
     for (int i = 0; buf[i+1] != 0; i++) {
       if (buf[i] == '.') {
         continue; // 小数点は飛ばすだけで，nは増やさない．
-      }else if (buf[i] == ' ') {
-        n++; // 空白はダイヤルを埋めるのでnを進める．
-        continue;
+      // }else if (buf[i] == ' ') {
+      //   n++; // 空白はダイヤルを埋めるのでnを進める．
+      //   continue;
       } else {
+        if (buf[i] == ' ') buf[i] = '0';
+
         // ダイヤルのインデックスについて範囲外アクセス防止（念の為）
         if (n >= _digits_int + _digits_dec) break;
 
@@ -325,6 +327,8 @@ public:
         n++; // ダイヤルのインデックスを進める．
       }
     }
+
+    
   }
 
   // メインキャンバスへの描画
@@ -365,7 +369,7 @@ public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
-      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 0.3)
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -502,7 +506,8 @@ void setup() {
   canvas.createSprite(lcd.width(), lcd.height());
 }
 
-int i = 0;
+float target = 8.0;
+bool incre = true;
 void loop() {
   // 時間管理
   unsigned long current_time_ms = millis();
@@ -519,12 +524,18 @@ void loop() {
   
   // --- 描画処理 ---
   //indicator.update(sensor.getSpeedKmh(), dt_s);
-  i++;
-  if (i > 250) {
-    indicator.update(0.0, dt_s);
+  if (incre) {
+    target += 0.03;
+    if (target > 12.0) {
+      incre = false;
+    }
   } else {
-    indicator.update(23.45, dt_s);
+    target -= 0.03;
+    if (target <= 8.0) {
+      incre = true;
+    }
   }
+  indicator.update(target, dt_s);
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
