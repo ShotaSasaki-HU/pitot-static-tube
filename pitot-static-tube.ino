@@ -554,10 +554,10 @@ public:
     canvas->setFont(&fonts::FreeSans12pt7b);
 
     canvas->drawString("KMH", center_x - 33, center_y + 18); // "KMH"
-    canvas->drawString("%", center_x + 36, center_y - 28); // '%'
+    canvas->drawString("%", center_x + 36, center_y - 40); // '%'
 
     _digital_airspeed.draw(canvas, center_x - 33, center_y + 25);
-    _digital_battery.draw(canvas, center_x - 33, center_y - 25 - 27);
+    _digital_battery.draw(canvas, center_x - 33, center_y - 64);
     _vmo_pointer.draw(canvas, center_x, center_y);
     _speed_pointer.draw(canvas, center_x, center_y);
     canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45)); // 中央の円
