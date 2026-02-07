@@ -438,7 +438,7 @@ public:
     _max_scale_kmh = 50.0;
     _minor_tick_interval_kmh = 1.0;
     _major_tick_interval_kmh = 5.0 * _minor_tick_interval_kmh;
-    _number_interval_kmh = 2.0 * _major_tick_interval_kmh;
+    _number_interval_kmh = 1.0 * _major_tick_interval_kmh;
 
     // Speed Pointer
     _speed_pointer.setPivot(_speed_pointer.width() >> 1, _speed_pointer.height());
@@ -523,7 +523,24 @@ public:
       }
     }
 
-    _digital_airspeed.draw(canvas, center_x - 33, center_y + 33);
+    // テキスト描画の設定
+    canvas->setTextColor(TFT_WHITE); // 第1引数：文字色，第2引数：背景色
+    canvas->setTextSize(1.0); // 倍率
+    canvas->setTextDatum(textdatum_t::middle_center); // 基準点（Datum）
+    canvas->setFont(&fonts::FreeSans12pt7b);
+
+    // 目盛の数字
+    r = 85.0;
+    for (int i = 0; i <= _max_scale_kmh; i += _number_interval_kmh) {
+      float angle = mapFloat(float(i), 0.0, _max_scale_kmh, 0.0, _max_angle);
+      angle -= 90.0; // canvasの座標上の単位円における角度
+      angle *= DEG_TO_RAD; // 三角関数のために変換
+      float x = (r * cos(angle)) + float(center_x);
+      float y = (r * sin(angle)) + float(center_y);
+      canvas->drawNumber(i, x, y);
+    }
+
+    _digital_airspeed.draw(canvas, center_x - 33, center_y + 25);
     // Digital Battery
     _vmo_pointer.draw(canvas, center_x, center_y);
     _speed_pointer.draw(canvas, center_x, center_y);
