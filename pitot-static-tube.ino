@@ -310,7 +310,17 @@ public:
           y_main += coef * _normal_height;  // 桁上がりによるシフト
         }
 
-        _sprite.drawString(String(buf[i]), x_main, y_main); // drawCharだとDatumの設定が無視される．
+        // drawCharだとDatumの設定が無視される．
+        _sprite.drawString(String((buf[i] - '0' + 1 + 10) % 10), x_main, y_main - _normal_height);
+        _sprite.drawString(String(buf[i]), x_main, y_main);
+        _sprite.drawString(String((buf[i] - '0' - 1 + 10) % 10), x_main, y_main + _normal_height);
+
+        // 小数点の描画
+        if (n + 1 == _digits_int) {
+          int x_dot = x_main + (dial_width / 2) - 2;
+          int y_dot = (_tall_height >> 1) + y_visual_offset;
+          _sprite.drawString(String('.'), x_dot, y_dot);
+        }
 
         n++; // ダイヤルのインデックスを進める．
       }
@@ -355,7 +365,7 @@ public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
-      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 0.1)
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 0.3)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -492,6 +502,7 @@ void setup() {
   canvas.createSprite(lcd.width(), lcd.height());
 }
 
+int i = 0;
 void loop() {
   // 時間管理
   unsigned long current_time_ms = millis();
@@ -508,7 +519,12 @@ void loop() {
   
   // --- 描画処理 ---
   //indicator.update(sensor.getSpeedKmh(), dt_s);
-  indicator.update(23.45, dt_s);
+  i++;
+  if (i > 250) {
+    indicator.update(0.0, dt_s);
+  } else {
+    indicator.update(23.45, dt_s);
+  }
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
