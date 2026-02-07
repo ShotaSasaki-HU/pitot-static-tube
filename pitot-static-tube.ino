@@ -242,7 +242,7 @@ public:
 
     // テキスト描画の設定
     _sprite.setTextColor(TFT_WHITE); // 第1引数：文字色，第2引数：背景色
-    _sprite.setTextSize(0.8); // 倍率
+    _sprite.setTextSize(0.7); // 倍率
     _sprite.setTextDatum(textdatum_t::middle_center); // 基準点（Datum）
     // _sprite.setFont(&fonts::Font4);
     // _sprite.setFont(&fonts::Orbitron_Light_24); // SFチックなフォント（32も可）．drawCharだとダメ，drawStringならOK．
@@ -265,6 +265,8 @@ public:
 
   // スプライトを描画するメソッド
   void createSpriteImage() {
+    float dial_width = _width / (float)(_digits_int + _digits_dec);
+
     // ダイヤルの背景色を設定
     _sprite.fillScreen(_sprite.color888(44, 44, 44));
 
@@ -291,16 +293,15 @@ public:
     for (int i = 0; buf[i+1] != 0; i++) {
       if (buf[i] == '.') {
         continue; // 小数点は飛ばすだけで，nは増やさない．
-      // }else if (buf[i] == ' ') {
-      //   n++; // 空白はダイヤルを埋めるのでnを進める．
-      //   continue;
+      }else if (buf[i] == ' ') {
+        n++; // 空白はダイヤルを埋めるのでnを進める．
+        continue;
       } else {
-        if (buf[i] == ' ') buf[i] = '0';
+        // if (buf[i] == ' ') buf[i] = '0';
 
         // ダイヤルのインデックスについて範囲外アクセス防止（念の為）
         if (n >= _digits_int + _digits_dec) break;
 
-        float dial_width = _width / (float)(_digits_int + _digits_dec);
         int x_main = (int)((dial_width * n) + (dial_width / 2));
 
         int y_visual_offset = 3; // 視覚的な中心とフォントの中心を揃えるためのオフセット
@@ -328,7 +329,68 @@ public:
       }
     }
 
-    
+    // 白枠
+    int x0, y0, x1, y1;
+    bool is_tall_prev = false;
+    for (int i = _digits_int + _digits_dec - 1; i >= 0 ; i--) {
+      bool is_tall = (_tall_flags >> i) & 1;
+
+      // 上の横線
+      x0 = (_digits_int + _digits_dec - 1 - i) * dial_width;
+      x1 = x0 + dial_width;
+      if (is_tall) {
+        y0 = 0;
+        y1 = 0;
+      } else {
+        y0 = _normal_height / 3;
+        y1 = _normal_height / 3;
+      }
+      _sprite.drawLine(x0, y0, x1, y1, _sprite.color888(255, 255, 255));
+
+      // 下の横線
+      if (is_tall) {
+        y0 = _tall_height - 1; // 1ピクセル内側にずらさないとはみ出す．
+        y1 = _tall_height - 1;
+      } else {
+        y0 = _normal_height * 4 / 3 - 1;
+        y1 = _normal_height * 4 / 3 - 1;
+      }
+      _sprite.drawLine(x0, y0, x1, y1, _sprite.color888(255, 255, 255));
+
+      if (i == _digits_int + _digits_dec - 1) {
+        // 左端の縦線（無条件で最大長）
+        _sprite.drawLine(0, 0, 0, _tall_height, _sprite.color888(255, 255, 255));
+      } else if (i == 0) {
+        // 右端の縦線（無条件で最大長）
+        _sprite.drawLine(_width - 1, 0, _width - 1, _tall_height, _sprite.color888(255, 255, 255));
+      }
+
+      // 高さの増減に伴う縦線（増加でも減少でも書く線は同じ）
+      if (is_tall != is_tall_prev && i != _digits_int + _digits_dec - 1) { // 左端のダイヤルはスキップ
+        // 増減があれば，現在のダイヤルの左側上下に短い線を書く．
+        _sprite.drawLine(x0, 0, x0, _normal_height / 3, _sprite.color888(255, 255, 255));
+        _sprite.drawLine(x0, _normal_height * 4 / 3, x0, _tall_height, _sprite.color888(255, 255, 255));
+      }
+
+      is_tall_prev = is_tall;
+    }
+
+    // _tall_flagsによる表示領域の高さ調整
+    for (int i = _digits_int + _digits_dec - 1; i >= 0 ; i--) {
+      bool is_tall = (_tall_flags >> i) & 1;
+
+      int w = dial_width;
+      int h = _normal_height / 3;
+      if (!is_tall) {
+        int x = (_digits_int + _digits_dec - 1 - i) * dial_width;
+
+        int y = 0;
+        _sprite.fillRect(x, y, w, h, TRANSPARENT);
+
+        y = _normal_height * 4 / 3;
+        _sprite.fillRect(x, y, w, h, TRANSPARENT);
+      }
+    }
   }
 
   // メインキャンバスへの描画
