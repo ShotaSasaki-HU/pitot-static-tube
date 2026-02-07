@@ -239,6 +239,14 @@ public:
   {
     _sprite.setColorDepth(16);
     _sprite.createSprite(_width, _tall_height);
+
+    // テキスト描画の設定
+    _sprite.setTextColor(TFT_WHITE); // 第1引数：文字色，第2引数：背景色
+    _sprite.setTextSize(0.8); // 倍率
+    _sprite.setTextDatum(textdatum_t::middle_center); // 基準点（Datum）
+    // _sprite.setFont(&fonts::Font4);
+    // _sprite.setFont(&fonts::Orbitron_Light_24); // SFチックなフォント（32も可）．drawCharだとダメ，drawStringならOK．
+    _sprite.setFont(&fonts::FreeSans18pt7b);
   }
 
   void update(float target_val, float dt_s) {
@@ -257,19 +265,73 @@ public:
 
   // スプライトを描画するメソッド
   void createSpriteImage() {
-    // _sprite.fillScreen(_sprite.color888(44, 44, 44)); // ダイヤルの背景色を設定
-    _sprite.fillScreen(_sprite.color888(255, 0, 0)); // ダイヤルの背景色を設定
+    // ダイヤルの背景色を設定
+    _sprite.fillScreen(_sprite.color888(44, 44, 44));
 
     // ドラム間の区切り線
     int digit_width = _width / (_digits_int + _digits_dec);
     for (int i = 1; i * digit_width <= _width; i++) {
       _sprite.drawLine(i * digit_width, 0, i * digit_width, _tall_height, _sprite.color888(1, 1, 1));
     }
+
+    // _current_val（小数）を文字列に変換
+    // 各桁をインデックスで取得できるようにするため．
+    char buf[16];
+    int digits_full = 0;
+    // 以下の条件以外は，仕様外とみなして対応しない．
+    if (_digits_int > 0 && _digits_dec > 0) {
+      digits_full = _digits_int + 1 + _digits_dec + 1; // 整数の桁数 + 小数点 + 小数の桁数 + 隠れ値
+    } else if (_digits_int > 0 && _digits_dec == 0) {
+      digits_full = _digits_int + 1 + 1; // 整数の桁数 + 小数点 + 隠れ値
+    }
+    dtostrf(_current_val, digits_full, _digits_dec + 1, buf); // 第2引数は全幅ではなく，全幅の最低保証である事に注意．
+
+    // bufの左端から描画していく．
+    int n = 0; // ダイヤルのインデックスは，bufのインデックスiとは一致しない．
+    for (int i = 0; buf[i+1] != 0; i++) {
+      if (buf[i] == '.') {
+        continue; // 小数点は飛ばすだけで，nは増やさない．
+      }else if (buf[i] == ' ') {
+        n++; // 空白はダイヤルを埋めるのでnを進める．
+        continue;
+      } else {
+        // ダイヤルのインデックスについて範囲外アクセス防止（念の為）
+        if (n >= _digits_int + _digits_dec) break;
+
+        float dial_width = _width / (float)(_digits_int + _digits_dec);
+        int x_main = (int)((dial_width * n) + (dial_width / 2));
+
+        int y_visual_offset = 3; // 視覚的な中心とフォントの中心を揃えるためのオフセット
+        int y_main = (_tall_height >> 1) + y_visual_offset;
+
+        if (isShiftRequired(buf, i)) {
+          char last = buf[strlen(buf) - 1]; // 最後尾の数字
+          float coef = (last - '0') / 10.0; // C/C++では，'0'〜'9'が文字コード上で連続しているため減算できる．
+          y_main += coef * _normal_height;  // 桁上がりによるシフト
+        }
+
+        _sprite.drawString(String(buf[i]), x_main, y_main); // drawCharだとDatumの設定が無視される．
+
+        n++; // ダイヤルのインデックスを進める．
+      }
+    }
   }
 
   // メインキャンバスへの描画
   void draw(LGFX_Sprite* canvas, int32_t x, int32_t y) {
     _sprite.pushSprite(canvas, x, y, TRANSPARENT);
+  }
+
+private:
+  bool isShiftRequired(const char* buf, int i) {
+    /**
+     * @brief buf中のインデックスで指定した数字に桁上がりのシフトが必要か判定するメソッド
+     */
+    for (int j = i + 1; buf[j+1] != '\0'; j++) {
+      if (buf[j] == '.') continue;
+      if (buf[j] != '9') return false;
+    }
+    return true;
   }
 };
 
@@ -293,7 +355,7 @@ public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
-      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0)
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 0.1)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -445,7 +507,8 @@ void loop() {
   }
   
   // --- 描画処理 ---
-  indicator.update(sensor.getSpeedKmh(), dt_s);
+  //indicator.update(sensor.getSpeedKmh(), dt_s);
+  indicator.update(23.45, dt_s);
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
