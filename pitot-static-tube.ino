@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SensirionI2CSdp.h>
-#include <LovyanGFX.hpp> // v1.2.7
+#include <LovyanGFX.hpp>
 #include <WiFi.h>
 
 #define SDA_PIN 6
@@ -101,8 +101,8 @@ public:
       cfg.spi_3wire = true;              // 受信をMOSIピンで行う場合はtrueを設定 = 受信線(MISO)を使わない設定？
       cfg.use_lock = true;               // トランザクションロックを使用する場合はtrueを設定
       cfg.dma_channel = SPI_DMA_CH_AUTO; // 使用するDMAチャンネルを設定
-      cfg.pin_sclk = 8;
-      cfg.pin_mosi = 10;
+      cfg.pin_sclk = 8;  // ディスプレイの"SCL"
+      cfg.pin_mosi = 10; // ディスプレイの"SDA"
       cfg.pin_miso = -1; // -1 = disable
       cfg.pin_dc = 5;
 
@@ -198,13 +198,88 @@ public:
   uint16_t height() const { return _sprite.height(); }
 };
 
+class RotatingDials {
+private:
+  LGFX_Sprite _sprite; // 自分専用の描画領域
+
+  int _width;           // 幅
+  int _normal_height;   // 標準の高さ
+  int _tall_height;     // 高さ（大きい方）
+  uint16_t _tall_flags; // 高さを大きくする桁のフラグ（2進数）
+  
+  int _digits_int; // 整数部の桁数
+  int _digits_dec; // 小数部の桁数
+
+  // アニメーション用状態
+  float _current_val;        // 現在表示中の値
+  float _max_change_per_sec; // 追従制限
+
+  // static: クラス全体で1個のみ．
+  // constexpr: コンパイル時に値が決定する定数．ベタ書きの数値リテラルと同じで，命令に埋め込まれる．
+  static constexpr uint32_t TRANSPARENT = 0x000000; // 透過色を黒に設定
+
+public:
+  RotatingDials(
+    LGFX* lgfx,
+    int width, int normal_height, uint16_t tall_flags,
+    int digits_int, int digits_dec,
+    float max_change_per_sec
+  )
+    : _sprite(lgfx),
+
+      _width(width),
+      _normal_height(normal_height),
+      _tall_height(normal_height * 5 / 3),
+      _tall_flags(tall_flags),
+
+      _digits_int(digits_int),
+      _digits_dec(digits_dec),
+
+      _max_change_per_sec(max_change_per_sec)
+  {
+    _sprite.setColorDepth(16);
+    _sprite.createSprite(_width, _tall_height);
+  }
+
+  void update(float target_val, float dt_s) {
+    /**
+     * @brief 追従制限ありの状態で現在値を更新するメソッド
+     */
+    float diff = target_val - _current_val;
+    float step = _max_change_per_sec * dt_s;
+
+    if (abs(diff) < step) {
+      _current_val = target_val; // 十分近ければ即時反映
+    } else {
+      _current_val += (diff > 0 ? step : -step); // 追従制限にぶつかる場合は，最大限変化させる．
+    }
+  }
+
+  // スプライトを描画するメソッド
+  void createSpriteImage() {
+    // _sprite.fillScreen(_sprite.color888(44, 44, 44)); // ダイヤルの背景色を設定
+    _sprite.fillScreen(_sprite.color888(255, 0, 0)); // ダイヤルの背景色を設定
+
+    // ドラム間の区切り線
+    int digit_width = _width / (_digits_int + _digits_dec);
+    for (int i = 1; i * digit_width <= _width; i++) {
+      _sprite.drawLine(i * digit_width, 0, i * digit_width, _tall_height, _sprite.color888(1, 1, 1));
+    }
+  }
+
+  // メインキャンバスへの描画
+  void draw(LGFX_Sprite* canvas, int32_t x, int32_t y) {
+    _sprite.pushSprite(canvas, x, y, TRANSPARENT);
+  }
+};
+
 class AirspeedIndicator {
 private:
   // 部品
   RotatableSprite _speed_pointer;
   RotatableSprite _vmo_pointer;
-  // RollingDial _digital_airspeed;
-  // RollingDial _digital_battery;
+  RotatingDials _digital_airspeed;
+  // RotatingDials _digital_battery;
 
   // 設定値
   float _max_operating_airspeed;
@@ -217,11 +292,12 @@ private:
 public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
-      _vmo_pointer(lgfx, 11, 102)
+      _vmo_pointer(lgfx, 11, 102),
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0)
   {
-    _max_operating_airspeed = 35.0;
+    _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
-    _max_scale_kmh = 55.0;
+    _max_scale_kmh = 50.0;
     _minor_tick_interval_kmh = 1.0;
     _major_tick_interval_kmh = 5.0 * _minor_tick_interval_kmh;
     _number_interval_kmh = 2.0 * _major_tick_interval_kmh;
@@ -270,6 +346,8 @@ public:
     _speed_pointer.setAngle(angle);
 
     // Digital Airspeed
+    _digital_airspeed.update(raw_speed_kmh, dt_s);
+    _digital_airspeed.createSpriteImage();
 
     // Digital Battery
   }
@@ -307,10 +385,10 @@ public:
       }
     }
 
-    // Digital Airspeed
+    _digital_airspeed.draw(canvas, center_x - 33, center_y + 33);
     // Digital Battery
-    _vmo_pointer.draw(canvas, center_x, center_y); // Vmo Pointer
-    _speed_pointer.draw(canvas, center_x, center_y); // Speed Pointer
+    _vmo_pointer.draw(canvas, center_x, center_y);
+    _speed_pointer.draw(canvas, center_x, center_y);
     canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45)); // 中央の円
   }
 
