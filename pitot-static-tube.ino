@@ -417,7 +417,7 @@ private:
   RotatableSprite _speed_pointer;
   RotatableSprite _vmo_pointer;
   RotatingDials _digital_airspeed;
-  // RotatingDials _digital_battery;
+  RotatingDials _digital_battery;
 
   // 設定値
   float _max_operating_airspeed;
@@ -431,7 +431,8 @@ public:
   AirspeedIndicator(LGFX* lgfx)
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
-      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0)
+      _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0),
+      _digital_battery(lgfx, 66, 27, 0b000, 3, 0, 10.0)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -477,7 +478,7 @@ public:
     _vmo_pointer.setAngle(angle);
   }
 
-  void update(float raw_speed_kmh, float dt_s) {
+  void update(float raw_speed_kmh, float dt_s, float battery_level) {
     // Speed Pointer（生値に即応）
     float clamped_speed = constrain(raw_speed_kmh, 0.0, _max_scale_kmh);
     float angle = mapFloat(clamped_speed, 0.0, _max_scale_kmh, 0.0, _max_angle);
@@ -488,6 +489,8 @@ public:
     _digital_airspeed.createSpriteImage();
 
     // Digital Battery
+    _digital_battery.update(battery_level, dt_s);
+    _digital_battery.createSpriteImage();
   }
 
   void draw(LGFX_Sprite* canvas) {
@@ -523,13 +526,12 @@ public:
       }
     }
 
-    // テキスト描画の設定
+    // 目盛の数字
     canvas->setTextColor(TFT_WHITE); // 第1引数：文字色，第2引数：背景色
     canvas->setTextSize(1.0); // 倍率
     canvas->setTextDatum(textdatum_t::middle_center); // 基準点（Datum）
     canvas->setFont(&fonts::FreeSans12pt7b);
 
-    // 目盛の数字
     r = 85.0;
     for (int i = 0; i <= _max_scale_kmh; i += _number_interval_kmh) {
       float angle = mapFloat(float(i), 0.0, _max_scale_kmh, 0.0, _max_angle);
@@ -540,8 +542,17 @@ public:
       canvas->drawNumber(i, x, y);
     }
 
+    // 単位の描画
+    canvas->setTextColor(canvas->color888(43, 80, 145)); // 第1引数：文字色，第2引数：背景色
+    canvas->setTextSize(0.7); // 倍率
+    canvas->setTextDatum(textdatum_t::top_left); // 基準点（Datum）
+    canvas->setFont(&fonts::FreeSans12pt7b);
+
+    canvas->drawString("KMH", center_x - 33, center_y + 18); // "KMH"
+    canvas->drawString("%", center_x + 36, center_y - 28); // '%'
+
     _digital_airspeed.draw(canvas, center_x - 33, center_y + 25);
-    // Digital Battery
+    _digital_battery.draw(canvas, center_x - 33, center_y - 25 - 27);
     _vmo_pointer.draw(canvas, center_x, center_y);
     _speed_pointer.draw(canvas, center_x, center_y);
     canvas->fillCircle(center_x, center_y, 14, canvas->color888(62, 51, 45)); // 中央の円
@@ -614,7 +625,7 @@ void loop() {
       incre = true;
     }
   }
-  indicator.update(target, dt_s);
+  indicator.update(target, dt_s, 100.0);
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
