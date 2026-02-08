@@ -2,10 +2,12 @@
 1. 差圧センサによる流速測定の実現性検証
     - SDP810_500Paを用いた微差圧計測とベルヌーイの定理による流速変換
     - I2C通信の安定性確認
+
 2. 円形IPSディスプレイの駆動検証
     - ESP32-C3とGC9A01間のSPI通信の安定性確認
     - アナログメーター風UIの描画パフォーマンス確認
 <img src="./docs/the_classic_boeing_airspeed_indicator.jpg" width=300 alt="The Classic Boeing Airspeed Indicator">
+
 3. リチウムイオンバッテリーの運用検証
     - XIAO-ESP32-C3内蔵のバッテリー充電回路の活用
     - 分圧抵抗によるバッテリー電圧監視と残量推定
