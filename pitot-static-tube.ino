@@ -601,8 +601,6 @@ void setup() {
   canvas.createSprite(lcd.width(), lcd.height());
 }
 
-float target = 8.0;
-bool incre = true;
 void loop() {
   // 時間管理
   unsigned long current_time_ms = millis();
@@ -618,19 +616,7 @@ void loop() {
   }
   
   // --- 描画処理 ---
-  //indicator.update(sensor.getSpeedKmh(), dt_s);
-  if (incre) {
-    target += 0.03;
-    if (target > 12.0) {
-      incre = false;
-    }
-  } else {
-    target -= 0.03;
-    if (target <= 8.0) {
-      incre = true;
-    }
-  }
-  indicator.update(target, dt_s, 100.0);
+  indicator.update(sensor.getSpeedKmh(), dt_s, 100.0);
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
