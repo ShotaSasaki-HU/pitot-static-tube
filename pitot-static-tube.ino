@@ -104,7 +104,7 @@ public:
       cfg.pin_sclk = 8;  // ディスプレイの"SCL"
       cfg.pin_mosi = 10; // ディスプレイの"SDA"
       cfg.pin_miso = -1; // -1 = disable
-      cfg.pin_dc = 5;
+      cfg.pin_dc = 21;
 
       _bus_instance.config(cfg);              // 設定値をバスに反映
       _panel_instance.setBus(&_bus_instance); // バスをパネルにセット
@@ -114,8 +114,8 @@ public:
       // 表示パネル制御の設定
       auto cfg = _panel_instance.config(); // 表示パネル設定用の構造体を取得
 
-      cfg.pin_cs = 4;    // CSが接続されているピン番号   (-1 = disable)
-      cfg.pin_rst = 3;   // RSTが接続されているピン番号  (-1 = disable)
+      cfg.pin_cs = 9;    // CSが接続されているピン番号   (-1 = disable)
+      cfg.pin_rst = 20;  // RSTが接続されているピン番号  (-1 = disable)
       cfg.pin_busy = -1; // BUSYが接続されているピン番号 (-1 = disable)
 
       cfg.panel_width = 240;    // 実際に表示可能な幅
