@@ -487,7 +487,7 @@ public:
     : _speed_pointer(lgfx, 8, 102),
       _vmo_pointer(lgfx, 11, 102),
       _digital_airspeed(lgfx, 66, 27, 0b001, 2, 1, 10.0, true),
-      _digital_battery(lgfx, 66, 27, 0b000, 3, 0, 10.0, false)
+      _digital_battery(lgfx, 66, 27, 0b000, 1, 2, 100.0, true)
   {
     _max_operating_airspeed = 40.0;
     _max_angle = 335.0;
@@ -603,8 +603,8 @@ public:
     canvas->setTextDatum(textdatum_t::top_left); // 基準点（Datum）
     canvas->setFont(&fonts::FreeSans12pt7b);
 
-    canvas->drawString("KMH", center_x - 33, center_y + 18); // "KMH"
-    canvas->drawString("%", center_x + 36, center_y - 40); // '%'
+    canvas->drawString("KMH", center_x - 33, center_y + 18);
+    canvas->drawString("V", center_x + 36, center_y - 40);
 
     _digital_airspeed.draw(canvas, center_x - 33, center_y + 25);
     _digital_battery.draw(canvas, center_x - 33, center_y - 64);
@@ -672,7 +672,7 @@ void loop() {
   Serial.print(battery.getPercentage()); Serial.println("%)");
   
   // 描画処理
-  indicator.update(sensor.getSpeedKmh(), dt_s, battery.getPercentage());
+  indicator.update(sensor.getSpeedKmh(), dt_s, battery.getVoltage());
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
