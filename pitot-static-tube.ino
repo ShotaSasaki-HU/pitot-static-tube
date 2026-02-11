@@ -8,6 +8,60 @@
 #define SCL_PIN 7
 #define SDP810_500Pa_I2C_ADDRESS 0x25
 
+// バッテリー計測用ピン定義
+#define BATTERY_PIN A0 // GPIO2
+
+class BatteryMonitor {
+private:
+  const float _r1 = 22000.0; // 分圧抵抗1（GND側）
+  const float _r2 = 22000.0; // 分圧抵抗2（電池側）
+  const float _v_ref = 3.3; // ADC基準電圧（微調整の必要あり）
+
+  float _voltage = 0.0;
+  float _percentage = 0.0;
+
+public:
+  BatteryMonitor() {}
+
+  void begin() {
+    pinMode(BATTERY_PIN, INPUT);
+  }
+
+  void update() {
+    // 分散低減のために単純平均を取る．
+    uint32_t raw_sum = 0;
+    const int samples = 10;
+    for (int i = 0; i < samples; i++) {
+      raw_sum += analogRead(BATTERY_PIN);
+      delay(1);
+    }
+    float raw_avg = raw_sum / (float)samples;
+
+    Serial.print("Raw ADC: ");
+    Serial.println(raw_avg);
+
+    // 電圧計算: (AD値 / 分解能) * 基準電圧 * 分圧比逆数
+    // 分圧比 = R1 / (R1 + R2) = 0.5
+    // 逆数 = 2.0
+    float divider_ratio = (_r1 + _r2) / _r1;
+    float current_v = (raw_avg / 4095.0) * _v_ref * divider_ratio;
+
+    // 簡易ローパスフィルタ（前回の値と混ぜて滑らかにする）
+    if (_voltage == 0.0) {
+      _voltage = current_v; // 初回
+    } else {
+      _voltage = (_voltage * 0.9) + (current_v * 0.1);
+    }
+
+    // パーセント計算（Li-Po: 4.2V=100%, 3.2V=0% と仮定）
+    float p = (_voltage - 3.2) / (4.2 - 3.2) * 100.0;
+    _percentage = constrain(p, 0.0, 100.0);
+  }
+
+  float getVoltage() const { return _voltage; }
+  float getPercentage() const { return _percentage; }
+};
+
 class PitotStaticTube {
 private:
   SensirionI2CSdp sdp; // センサのインスタンス
@@ -569,6 +623,7 @@ public:
   }
 };
 
+BatteryMonitor battery;
 PitotStaticTube sensor;
 
 LGFX lcd; // ディスプレイのインスタンス
@@ -583,17 +638,17 @@ void setup() {
   btStop();
 
   Serial.begin(115200); // シリアル通信開始
-  while (!Serial) {
-    delay(100); // シリアル接続待ち
-  }
+  // while (!Serial) delay(100); // シリアル接続待ち
 
   Wire.begin(SDA_PIN, SCL_PIN); // I2Cの初期化
   Wire.setClock(50000); // 50kHz（安定性重視で低め）
 
   if (!sensor.begin()) {
     Serial.println("Sensor Init Failed!");
-    while(1) { delay(100); }
+    // while(1) { delay(100); }
   }
+
+  battery.begin();
 
   lcd.init();
   lcd.setRotation(0); // 回転方向を 0～3 の4方向から設定します．（4～7を使用すると上下反転になります．）
@@ -610,13 +665,18 @@ void loop() {
   if (sensor.update()) {
     Serial.print("Press: "); Serial.print(sensor.getPressurePa()); Serial.print(" Pa\t");
     Serial.print("Temp: ");  Serial.print(sensor.getCalibratedTemperatureC()); Serial.print(" C\t");
-    Serial.print("Speed: "); Serial.print(sensor.getSpeedKmh());   Serial.println(" km/h");
+    Serial.print("Speed: "); Serial.print(sensor.getSpeedKmh());   Serial.print(" km/h\t");
   } else {
     Serial.println("Sensor Read Error!");
   }
+
+  // バッテリー計測
+  battery.update();
+  Serial.print("Bat: "); Serial.print(battery.getVoltage()); Serial.print("V (");
+  Serial.print(battery.getPercentage()); Serial.println("%)");
   
-  // --- 描画処理 ---
-  indicator.update(sensor.getSpeedKmh(), dt_s, 100.0);
+  // 描画処理
+  indicator.update(sensor.getSpeedKmh(), dt_s, battery.getPercentage());
   indicator.draw(&canvas);
   canvas.pushSprite(0, 0); // 転送
 
