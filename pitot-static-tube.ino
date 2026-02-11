@@ -15,7 +15,6 @@ class BatteryMonitor {
 private:
   const float _r1 = 22000.0; // 分圧抵抗1（GND側）
   const float _r2 = 22000.0; // 分圧抵抗2（電池側）
-  const float _v_ref = 3.3; // ADC基準電圧（微調整の必要あり）
 
   float _voltage = 0.0;
   float _percentage = 0.0;
@@ -29,22 +28,19 @@ public:
 
   void update() {
     // 分散低減のために単純平均を取る．
-    uint32_t raw_sum = 0;
+    uint32_t v_batt = 0;
     const int samples = 10;
     for (int i = 0; i < samples; i++) {
-      raw_sum += analogRead(BATTERY_PIN);
+      v_batt += analogReadMilliVolts(BATTERY_PIN);
       delay(1);
     }
-    float raw_avg = raw_sum / (float)samples;
-
-    Serial.print("Raw ADC: ");
-    Serial.println(raw_avg);
+    float v_batt_avg = v_batt / (float)samples;
 
     // 電圧計算: (AD値 / 分解能) * 基準電圧 * 分圧比逆数
     // 分圧比 = R1 / (R1 + R2) = 0.5
     // 逆数 = 2.0
     float divider_ratio = (_r1 + _r2) / _r1;
-    float current_v = (raw_avg / 4095.0) * _v_ref * divider_ratio;
+    float current_v = divider_ratio * v_batt_avg / 1000.0;
 
     // 簡易ローパスフィルタ（前回の値と混ぜて滑らかにする）
     if (_voltage == 0.0) {
