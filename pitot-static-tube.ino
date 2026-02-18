@@ -66,7 +66,9 @@ private:
   float _calibrated_temp_c = 0.0;
   float _speed_kmh = 0.0;
 
-  float _temp_offset_c = -3.0; // 温度補正オフセット（自己発熱分）
+  float _temp_offset_c = 0.0; // 温度補正オフセット（自己発熱分）
+
+  float _pitot_tube_coefficient = 1.0; // ピトー管係数
 
 public:
   PitotStaticTube() {}
@@ -87,6 +89,10 @@ public:
      * @brief 温度補正オフセット値を外部から変更するメソッド（ハードコードを忌避）
      */
     _temp_offset_c = offset;
+  }
+
+  void setPitotTubeCoefficient(float coef) {
+    _pitot_tube_coefficient = coef;
   }
 
   bool update() {
@@ -120,6 +126,7 @@ public:
     if (_diff_pressure_pa > 0) {
       float speed_ms = sqrt((2.0 * _diff_pressure_pa) / rho);
       _speed_kmh = speed_ms * 3.6; // speed_ms * 60 * 60 / 1000
+      _speed_kmh *= _pitot_tube_coefficient; // ピトー管係数による補正
     } else {
       _speed_kmh = 0.0;
     }
@@ -643,6 +650,8 @@ void setup() {
     Serial.println("Sensor Init Failed!");
     // while(1) { delay(100); }
   }
+  sensor.setTemperatureOffset(-7.0);
+  sensor.setPitotTubeCoefficient(1.33);
 
   battery.begin();
 
